@@ -29,6 +29,8 @@ import (
 	latestV1 "github.com/GoogleContainerTools/skaffold/pkg/skaffold/schema/latest/v1"
 )
 
+const imageField = "image"
+
 type ResourceSelectorImages struct {
 	allowlist map[apimachinery.GroupKind]latestV1.ResourceFilter
 	denylist  map[apimachinery.GroupKind]latestV1.ResourceFilter
@@ -62,9 +64,12 @@ func (rsi *ResourceSelectorImages) allowByGroupKind(gk apimachinery.GroupKind) b
 }
 
 func (rsi *ResourceSelectorImages) allowByNavpath(gk apimachinery.GroupKind, navpath string, k string) (string, bool) {
+	matchedConfigConnectorImage := false
+
 	for _, w := range ConfigConnectorResourceSelector {
-		if w.Matches(gk.Group, gk.Kind) {
-			return "", true
+		if k == imageField && w.Matches(gk.Group, gk.Kind) {
+			matchedConfigConnectorImage = true
+			break
 		}
 	}
 
@@ -80,11 +85,10 @@ func (rsi *ResourceSelectorImages) allowByNavpath(gk apimachinery.GroupKind, nav
 	}
 
 	if rf, ok := rsi.allowlist[gk]; ok {
+		matchedConfigConnectorImage = false
+
 		for _, allowpath := range rf.Image {
-			if allowpath == ".*" {
-				if k != "image" {
-					return "", false
-				}
+			if allowpath == ".*" && k == imageField {
 				return "", true
 			}
 			if navpath == allowpath {
@@ -92,7 +96,7 @@ func (rsi *ResourceSelectorImages) allowByNavpath(gk apimachinery.GroupKind, nav
 			}
 		}
 	}
-	return "", false
+	return "", matchedConfigConnectorImage
 }
 
 // GetImages gathers a map of base image names to the image with its tag
@@ -107,7 +111,7 @@ type imageSaver struct {
 }
 
 func (is *imageSaver) Visit(gk apimachinery.GroupKind, navpath string, o map[string]interface{}, k string, v interface{}, rs ResourceSelector) bool {
-	if k != "image" {
+	if k != imageField {
 		return true
 	}
 
